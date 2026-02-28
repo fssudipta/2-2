@@ -1,73 +1,99 @@
 // the implementation interface
-interface Device{
+interface Device {
     void enable();
+
     void disable();
+
     void setVolume(int percent);
+
     void getChannel();
 }
-//concrete implementation first
-class TV implements Device{
+
+// concrete implementation first
+class TV implements Device {
     @Override
-    public void enable(){
+    public void enable() {
         System.out.println("TV: power on");
     }
+
     @Override
-    public void disable(){
+    public void disable() {
         System.out.println("TV: power off");
     }
+
     @Override
-    public void setVolume(int percent){
-        System.out.println("TV: volume is set to "+percent);
+    public void setVolume(int percent) {
+        System.out.println("TV: volume is set to " + percent);
     }
+
     @Override
-    public void getChannel(){
+    public void getChannel() {
         System.out.println("TV: channel is 6");
     }
 }
-//concrete implementation second
-class Radio implements Device{
+
+// concrete implementation second
+class Radio implements Device {
     @Override
-    public void enable(){
+    public void enable() {
         System.out.println("radio: power on");
     }
+
     @Override
-    public void disable(){
+    public void disable() {
         System.out.println("radio: power off");
     }
+
     @Override
-    public void setVolume(int percent){
-        System.out.println("radio: volume is set to "+percent);
+    public void setVolume(int percent) {
+        System.out.println("radio: volume is set to " + percent);
     }
+
     @Override
-    public void getChannel(){
+    public void getChannel() {
         System.out.println("radio: channel is 98.4");
     }
 }
 
 // the abstraction: defines what user can do
-abstract class RemoteControl{
-    protected Device device; //bridge connection
-    public RemoteControl(Device device){
-        this.device=device;
+abstract class RemoteControl {
+    protected Device device; // bridge connection
+
+    public RemoteControl(Device device) {
+        this.device = device;
     }
-    public void togglePower(){
+
+    public void togglePower() {
         device.enable();
     }
-    public void volumeDown(){
+
+    public void volumeDown() {
         device.setVolume(10);
     }
-    public void volumeUp(){
+
+    public void volumeUp() {
         device.setVolume(90);
     }
 }
-//fancy remote adding new features
-class AdvancedRemote extends RemoteControl{
-    public AdvancedRemote(Device device){
+
+// fancy remote adding new features
+class AdvancedRemote extends RemoteControl {
+    public AdvancedRemote(Device device) {
         super(device);
+    }
+
+    public void mute() {
+        System.out.println("AdavancedRemote: muting...");
+        device.setVolume(0);
+    }
+
+    public void getChannelInfo() {
+        System.out.print("AdvancedRemote: checking ");
+        device.getChannel();
     }
 }
 
-//gpt marsi
+// gpt marsi
 public class ElectronicsShop {
     public static void main(String[] args) {
         // 1. Create a Device (Implementation)
@@ -75,7 +101,7 @@ public class ElectronicsShop {
         Device radio = new Radio();
 
         // 2. Create a Remote (Abstraction) and bridge them
-        RemoteControl basicRemote = new RemoteControl(tv);
+        RemoteControl basicRemote = new BasicRemote(tv);
         AdvancedRemote advancedRemote = new AdvancedRemote(radio);
 
         // 3. Use the Basic Remote on the TV
