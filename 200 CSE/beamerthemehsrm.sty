@@ -1,0 +1,123 @@
+% HSRM Beamer Theme
+% Customized for gear logo color palette
+
+\mode<presentation>
+
+% Required packages
+\RequirePackage{tikz}
+\RequirePackage{xcolor}
+
+% Define colors based on the gear logo
+\definecolor{darkRed}{RGB}{165,42,42}        % Softer brown-red (more appealing)
+\definecolor{logoRed}{RGB}{178,34,34}        % Firebrick red (classic, not harsh)
+\definecolor{darkGray}{RGB}{50,50,50}        % Softer dark gray
+\definecolor{medGray}{RGB}{100,100,100}      % Medium gray
+\definecolor{lightGray}{RGB}{220,220,220}    % Light gray for backgrounds
+\definecolor{accentRed}{RGB}{205,92,92}      % Indian red (softer accent)
+
+% Set colors - minimalist approach
+\setbeamercolor{normal text}{fg=darkGray,bg=white}
+\setbeamercolor{structure}{fg=darkGray}
+\setbeamercolor{alerted text}{fg=darkRed}
+\setbeamercolor{example text}{fg=logoRed}
+
+% Frame title - minimalist with dark red
+\setbeamercolor{frametitle}{fg=white,bg=darkRed}
+\setbeamercolor{framesubtitle}{fg=lightGray,bg=darkRed}
+
+% Title page colors - clean and minimal
+\setbeamercolor{title}{fg=darkRed}
+\setbeamercolor{subtitle}{fg=darkGray}
+\setbeamercolor{author}{fg=medGray}
+\setbeamercolor{institute}{fg=medGray}
+\setbeamercolor{date}{fg=medGray}
+
+% Block colors - subtle and minimal
+\setbeamercolor{block title}{fg=white,bg=darkRed}
+\setbeamercolor{block body}{fg=darkGray,bg=lightGray!20}
+\setbeamercolor{block title alerted}{fg=white,bg=accentRed}
+\setbeamercolor{block body alerted}{fg=darkGray,bg=accentRed!10}
+\setbeamercolor{block title example}{fg=white,bg=logoRed}
+\setbeamercolor{block body example}{fg=darkGray,bg=logoRed!10}
+
+% Item colors
+\setbeamercolor{item}{fg=darkRed}
+\setbeamercolor{subitem}{fg=logoRed}
+\setbeamercolor{subsubitem}{fg=logoRed}
+
+% Section page - bold dark red
+\setbeamercolor{section page}{fg=white,bg=darkRed}
+\setbeamercolor{section in toc}{fg=darkGray}
+\setbeamercolor{subsection in toc}{fg=medGray}
+
+% Footer
+\setbeamercolor{footline}{fg=medGray,bg=white}
+\setbeamercolor{page number in head/foot}{fg=medGray}
+
+% Remove navigation symbols
+\setbeamertemplate{navigation symbols}{}
+
+% Frametitle - clean and minimal
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,ht=3ex,dp=1.5ex,leftskip=1cm,rightskip=1cm]{frametitle}%
+    \usebeamerfont{frametitle}\insertframetitle
+  \end{beamercolorbox}%
+  \vskip0.2cm
+}
+
+% Title page
+\setbeamertemplate{title page}{%
+  \vbox{}
+  \vfill
+  \begingroup
+    \centering
+    \begin{beamercolorbox}[sep=8pt,center]{title}
+      \usebeamerfont{title}\Huge\inserttitle\par%
+      \ifx\insertsubtitle\@empty%
+      \else%
+        \vskip0.5em%
+        {\usebeamerfont{subtitle}\Large\insertsubtitle\par}%
+      \fi%     
+    \end{beamercolorbox}%
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=8pt,center]{date}
+      \usebeamerfont{date}\insertdate
+    \end{beamercolorbox}%
+    \vskip2em\par
+    \begin{beamercolorbox}[sep=8pt,center]{author}
+      \usebeamerfont{author}\insertauthor
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,center]{institute}
+      \usebeamerfont{institute}\insertinstitute
+    \end{beamercolorbox}
+  \endgroup
+  \vfill
+}
+
+% Section page
+\AtBeginSection[]{%
+  \begin{frame}[plain,noframenumbering]
+    \vspace*{-1cm}
+    \begin{beamercolorbox}[sep=12pt,center,wd=\paperwidth,ht=\paperheight]{section page}
+      \vspace{3cm}
+      \usebeamerfont{section title}\Huge\textbf{\insertsection}\par
+    \end{beamercolorbox}
+  \end{frame}
+}
+
+% Items
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{enumerate items}[default]
+
+% Fonts
+\setbeamerfont{title}{size=\Huge,series=\bfseries}
+\setbeamerfont{subtitle}{size=\Large}
+\setbeamerfont{frametitle}{size=\large,series=\bfseries}
+\setbeamerfont{block title}{series=\bfseries}
+
+% Custom commands
+\newcommand{\quoted}[1]{›#1‹}
+\newcommand{\doublequoted}[1]{»#1«}
+
+\mode<all>

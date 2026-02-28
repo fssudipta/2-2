@@ -1,0 +1,1114 @@
+\documentclass[compress,aspectratio=169]{beamer}
+
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{
+  trees, shapes, arrows.meta, positioning, calc,
+  decorations.pathreplacing, backgrounds, fit, shadows.blur
+}
+\usetheme{hsrm}
+
+\setbeamercovered{transparent=15}
+
+\colorlet{PRI}{darkRed}
+\colorlet{SEC}{logoRed}
+\colorlet{HL}{accentRed}
+\colorlet{LG}{lightGray}
+
+\tikzset{
+  treenode/.style={
+    rectangle, draw=PRI, fill=LG!40,
+    rounded corners=3pt, minimum width=1.4cm,
+    minimum height=0.52cm, font=\small\bfseries,
+    blur shadow={shadow blur steps=3, shadow xshift=0.4mm, shadow yshift=-0.4mm}
+  },
+  leafnode/.style ={treenode, fill=HL!25,  draw=HL!80!black},
+  rootnode/.style ={treenode, fill=PRI,    text=white, draw=PRI},
+  mbr/.style      ={thick, rounded corners=1pt},
+  ghost/.style    ={opacity=0.18},
+  alive/.style    ={opacity=1.0},
+}
+
+\newcommand{\spatialgrid}[2]{%   #1=xmax  #2=ymax
+  \draw[LG!70, very thin, step=1] (0,0) grid (#1,#2);
+  \draw[-{Stealth[scale=0.7]}](0,0)--(#1+0.3,0) node[right,font=\tiny]{$x$};
+  \draw[-{Stealth[scale=0.7]}](0,0)--(0,#2+0.25) node[above,font=\tiny]{$y$};
+}
+
+\title{R-Trees}
+\subtitle{A Dynamic Index Structure for Spatial Searching}
+\date{February 23, 2026}
+\author{}
+\institute{}
+
+% =============================================================
+\begin{document}
+% =============================================================
+
+% ── Custom Title Page ─────────────────────────────────────────
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+
+  %% Dark red background panel (left 60%)
+  \fill[PRI]
+    (current page.north west) rectangle
+    ([xshift=0.60\paperwidth] current page.south west);
+
+  %% Subtle grid texture on red panel
+  \begin{scope}
+    \clip (current page.north west) rectangle
+          ([xshift=0.60\paperwidth] current page.south west);
+    \draw[white, opacity=0.06, step=0.4cm]
+      (current page.north west) grid
+      ([xshift=0.60\paperwidth] current page.south west);
+  \end{scope}
+
+  %% Diagonal accent stripe at seam
+  \fill[white, opacity=0.07]
+    ([xshift=0.60\paperwidth] current page.north west) --
+    ([xshift=0.635\paperwidth] current page.north west) --
+    ([xshift=0.635\paperwidth] current page.south west) --
+    ([xshift=0.60\paperwidth]  current page.south west) -- cycle;
+
+  %% BUET logo (top-left corner, on white bg area)
+  \node[anchor=north west, inner sep=0pt] at
+    ([xshift=0.625\paperwidth, yshift=-0.04\paperheight] current page.north west)
+    {\includegraphics[height=1.0cm]{BUET_LOGO.png}};
+
+  %% Title
+  \node[
+    anchor=west, text=white,
+    font=\LARGE\bfseries,
+    text width=0.52\paperwidth, align=left
+  ] at ([xshift=0.05\paperwidth, yshift=0.13\paperheight] current page.west)
+    {R-Trees};
+
+  %% Subtitle
+  \node[
+    anchor=west, text=white!80,
+    font=\normalsize,
+    text width=0.52\paperwidth, align=left
+  ] at ([xshift=0.05\paperwidth, yshift=0.04\paperheight] current page.west)
+    {A Dynamic Index Structure\\[3pt]for Spatial Searching};
+
+  %% Separator line
+  \draw[white, opacity=0.35, line width=0.8pt]
+    ([xshift=0.05\paperwidth, yshift=-0.025\paperheight] current page.west) --
+    ([xshift=0.55\paperwidth, yshift=-0.025\paperheight] current page.west);
+
+  %% Based-on + date
+  \node[
+    anchor=west, text=white!55,
+    font=\scriptsize\itshape
+  ] at ([xshift=0.05\paperwidth, yshift=-0.065\paperheight] current page.west)
+    {Based on Antonin Guttman's 1984 Paper \quad$\cdot$\quad February 23, 2026};
+
+  %% Right panel: Team card
+  \node[
+    anchor=center,
+    fill=white, rounded corners=7pt,
+    inner sep=14pt,
+    drop shadow={shadow xshift=0.5mm, shadow yshift=-0.5mm, opacity=0.15}
+  ] at ([xshift=0.805\paperwidth, yshift=0pt] current page.west) {%
+    \begin{minipage}{0.295\paperwidth}
+      \centering
+      {\color{PRI}\rule{0.22\paperwidth}{1.2pt}}\\[6pt]
+      {\color{darkGray}\scriptsize\bfseries\MakeUppercase{Presented by}}\\[9pt]
+      {\color{PRI}\small\bfseries Farhan Labib}\\
+      {\color{medGray}\scriptsize\texttt{2205071}}\\[8pt]
+      {\color{PRI}\small\bfseries Fatima Sad Sudipta}\\
+      {\color{medGray}\scriptsize\texttt{2205063}}\\[9pt]
+      {\color{PRI}\rule{0.22\paperwidth}{1.2pt}}\\[5pt]
+      {\color{medGray}\tiny
+        Bangladesh University of\\Engineering \& Technology}
+    \end{minipage}%
+  };
+
+\end{tikzpicture}
+\end{frame}
+
+\begin{frame}{Outline}
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[
+      anchor=east,
+      opacity=0.08,
+      inner sep=0pt
+    ] at ([xshift=0.01\paperwidth, yshift=-0.05\paperheight] current page.east)
+      {\includegraphics[width=0.50\paperwidth]{buet_logo.png}};
+  \end{tikzpicture}
+  \vspace*{-0.9em}
+  {\setbeamertemplate{section in toc}{%
+     \leavevmode\leftskip=0.5em$\bullet$\hspace{0.5em}\inserttocsection\par\vspace{0.15em}}%
+   \tableofcontents[hideallsubsections]}
+\end{frame}
+
+% =============================================================
+\section{Introduction}
+% =============================================================
+
+\begin{frame}{The Problem}
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+      \begin{block}{Traditional Indexes}
+        \begin{itemize}
+          \item B-trees, hash tables
+          \item One-dimensional keys
+          \item Exact-match queries
+        \end{itemize}
+      \end{block}
+      \vspace{0.4em}
+      \begin{alertblock}<2->{They struggle with\ldots}
+        \begin{itemize}
+          \item Multi-dimensional data
+          \item Objects with \emph{spatial extent}
+          \item ``Find all objects overlapping $S$''
+        \end{itemize}
+      \end{alertblock}
+    \column{0.46\textwidth}
+      \begin{exampleblock}<3->{Real-world examples}
+        \begin{itemize}
+          \item GIS: counties, roads, buildings
+          \item CAD: circuit layouts
+          \item Games: collision detection
+          \item Maps: nearest-place search
+        \end{itemize}
+      \end{exampleblock}
+      \vspace{0.4em}
+      \begin{block}<3->{}
+        \centering\alert{\bfseries We need a better structure!}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+% =============================================================
+\section{R-Tree Structure}
+% =============================================================
+
+\begin{frame}{Core Idea: Minimum Bounding Rectangles}
+  \begin{columns}[c]
+    \column{0.50\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.70]
+      \spatialgrid{7}{4.8}
+      % Objects — always solid
+      \fill[SEC!35, draw=SEC, thick, rounded corners=1pt] (0.4,0.6) rectangle (1.9,1.6);
+      \node[font=\tiny\bfseries] at(1.15,1.1){A};
+      \fill[SEC!35, draw=SEC, thick, rounded corners=1pt] (0.7,2.4) rectangle (2.1,3.6);
+      \node[font=\tiny\bfseries] at(1.4,3.0){B};
+      \fill[SEC!35, draw=SEC, thick, rounded corners=1pt] (3.4,0.4) rectangle (4.8,1.7);
+      \node[font=\tiny\bfseries] at(4.1,1.05){C};
+      \fill[SEC!35, draw=SEC, thick, rounded corners=1pt] (3.8,2.5) rectangle (6.0,3.8);
+      \node[font=\tiny\bfseries] at(4.9,3.15){D};
+      % MBR 1 — step 2
+      \begin{scope}
+        \only<1>{\tikzset{every path/.style={ghost}}}
+        \draw[PRI, very thick, dashed, rounded corners=2pt]
+              (0.25,0.45) rectangle (2.25,3.75);
+        \node[PRI, font=\small\bfseries] at(1.25,4.05){MBR$_1$};
+      \end{scope}
+      % MBR 2 — step 3
+      \begin{scope}
+        \only<1-2>{\tikzset{every path/.style={ghost}}}
+        \draw[HL!80!black, very thick, dashed, rounded corners=2pt]
+              (3.25,0.25) rectangle (6.15,3.95);
+        \node[HL!80!black, font=\small\bfseries] at(4.7,4.25){MBR$_2$};
+      \end{scope}
+    \end{tikzpicture}
+    \end{center}
+    \column{0.46\textwidth}
+      \begin{block}{Step \only<1>{1 — Objects}\only<2>{2 — Group left pair}\only<3->{3 — Group right pair}}
+        \only<1>{Four spatial objects in 2-D space.}%
+        \only<2>{Draw the tightest rectangle around A and B: the \alert{Minimum Bounding Rectangle (MBR)}.}%
+        \only<3->{Each MBR becomes one \alert{entry} in an R-tree internal node. MBRs \emph{may} overlap.}%
+      \end{block}
+      \vspace{0.4em}
+      \begin{itemize}
+        \item<2-> Every tree node $\approx$ one disk page
+        \item<2-> $m \le$ entries $\le M$ per node
+        \item<3-> All leaves at the same depth
+      \end{itemize}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{R-Tree Node Types \& Tree Shape}
+  \begin{columns}[T]
+    \column{0.44\textwidth}
+      \begin{block}{Leaf node entry\quad $(I,\ tuple\text{-}id)$}
+        \begin{itemize}
+          \item $I$ = MBR tightly wrapping the object
+          \item $tuple\text{-}id$ = pointer to data record
+        \end{itemize}
+      \end{block}
+      \vspace{0.3em}
+      \begin{block}{Internal node entry\quad $(I,\ child\text{-}ptr)$}
+        \begin{itemize}
+          \item $I$ = MBR covering \emph{all} children's MBRs
+          \item $child\text{-}ptr$ = address of child page
+        \end{itemize}
+      \end{block}
+    \column{0.52\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[
+      level distance=1.15cm,
+      level 1/.style={sibling distance=4.0cm},
+      level 2/.style={sibling distance=1.7cm},
+    ]
+      \node[rootnode] {Root}
+        child {node[treenode] {MBR$_1$}
+          child {node[leafnode, font=\tiny\bfseries]{A}}
+          child {node[leafnode, font=\tiny\bfseries]{B}}
+        }
+        child {node[treenode] {MBR$_2$}
+          child {node[leafnode, font=\tiny\bfseries]{C}}
+          child {node[leafnode, font=\tiny\bfseries]{D}}
+        };
+    \end{tikzpicture}
+    \end{center}
+  \end{columns}
+\end{frame}
+
+% =============================================================
+\section{Search Simulation}
+% =============================================================
+
+%% ── SEARCH SLIDE 1 of 4  (ghost future elements) ────────────
+\begin{frame}{Simulation: Search — Step 1, Tree Structure}
+  \begin{columns}[c]
+    \column{0.56\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.66]
+      \spatialgrid{8.8}{5.2}
+      % objects
+      \fill[blue!22,  draw=blue!55, thick] (0.5,0.9)  rectangle (1.9,2.0); \node[font=\tiny] at(1.2,1.45){Obj1};
+      \fill[blue!22,  draw=blue!55, thick] (0.8,3.0)  rectangle (2.2,4.2); \node[font=\tiny] at(1.5,3.6){Obj2};
+      \fill[green!25, draw=green!60!black, thick] (3.4,0.7)  rectangle (4.8,2.0); \node[font=\tiny] at(4.1,1.35){Obj3};
+      \fill[green!25, draw=green!60!black, thick] (3.9,2.8)  rectangle (5.6,4.2); \node[font=\tiny] at(4.75,3.5){Obj4};
+      \fill[orange!25,draw=orange!75, thick] (6.4,0.9)  rectangle (8.2,2.6); \node[font=\tiny] at(7.3,1.75){Obj5};
+      \fill[orange!25,draw=orange!75, thick] (6.8,3.3)  rectangle (8.4,4.7); \node[font=\tiny] at(7.6,4.0){Obj6};
+      % leaf MBRs — SOLID on step 1
+      \draw[blue, mbr, thick, dashed]          (0.4,0.8) rectangle (2.3,4.3);
+      \node[blue, font=\small\bfseries]        at(1.35,4.5){R8};
+      \draw[green!60!black, mbr, thick, dashed](3.3,0.6) rectangle (5.7,4.3);
+      \node[green!60!black, font=\small\bfseries] at(4.5,4.5){R9};
+      \draw[orange!75, mbr, thick, dashed]     (6.3,0.8) rectangle (8.5,4.8);
+      \node[orange!75, font=\small\bfseries]   at(7.4,5.0){R10};
+      % query box — GHOST on step 1
+      \draw[PRI, very thick, ghost] (1.4,1.8) rectangle (5.2,4.8);
+    \end{tikzpicture}
+    \end{center}
+    \column{0.40\textwidth}
+      \begin{block}{\textbf{Step 1} — Tree structure}
+        Three leaf groups: \textbf{R8}, \textbf{R9}, \textbf{R10}.\\[0.3em]
+        Each group's MBR tightly wraps its objects.
+      \end{block}
+      \vspace{0.4em}
+      \begin{block}<1->[ghost]{Step 2 — Coming next}
+        \textcolor{gray!60}{\small Issue a spatial query box $S$\ldots}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+%% ── SEARCH SLIDE 2 of 4 ─────────────────────────────────────
+\begin{frame}{Simulation: Search — Step 2, Issue Query $S$}
+  \begin{columns}[c]
+    \column{0.56\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.66]
+      \spatialgrid{8.8}{5.2}
+      \fill[blue!22,  draw=blue!55, thick] (0.5,0.9)  rectangle (1.9,2.0); \node[font=\tiny] at(1.2,1.45){Obj1};
+      \fill[blue!22,  draw=blue!55, thick] (0.8,3.0)  rectangle (2.2,4.2); \node[font=\tiny] at(1.5,3.6){Obj2};
+      \fill[green!25, draw=green!60!black, thick] (3.4,0.7)  rectangle (4.8,2.0); \node[font=\tiny] at(4.1,1.35){Obj3};
+      \fill[green!25, draw=green!60!black, thick] (3.9,2.8)  rectangle (5.6,4.2); \node[font=\tiny] at(4.75,3.5){Obj4};
+      \fill[orange!25,draw=orange!75, thick] (6.4,0.9)  rectangle (8.2,2.6); \node[font=\tiny] at(7.3,1.75){Obj5};
+      \fill[orange!25,draw=orange!75, thick] (6.8,3.3)  rectangle (8.4,4.7); \node[font=\tiny] at(7.6,4.0){Obj6};
+      % MBRs — normal
+      \draw[blue, mbr, thick, dashed]          (0.4,0.8) rectangle (2.3,4.3);
+      \node[blue, font=\small\bfseries]        at(1.00,4.5){R8};
+      \draw[green!60!black, mbr, thick, dashed](3.3,0.6) rectangle (5.7,4.3);
+      \node[green!60!black, font=\small\bfseries] at(4.5,4.5){R9};
+      \draw[orange!75, mbr, thick, dashed]     (6.3,0.8) rectangle (8.5,4.8);
+      \node[orange!75, font=\small\bfseries]   at(7.4,5.0){R10};
+      % query box — NOW SOLID
+      \draw[PRI, very thick] (1.4,1.8) rectangle (5.2,4.8);
+      \node[PRI, font=\small\bfseries] at(3.3,5.15){$S$ (query)};
+      % ghost: highlight coming next
+      \draw[PRI, very thick, ghost] (0.4,0.8) rectangle (2.3,4.3);
+      \draw[PRI, very thick, ghost] (3.3,0.6) rectangle (5.7,4.3);
+    \end{tikzpicture}
+    \end{center}
+    \column{0.40\textwidth}
+      \begin{block}{Step 2 — Issue query $S$}
+        For each MBR, ask:\\
+        \textbf{Does it overlap $S$?}
+      \end{block}
+      \vspace{0.4em}
+      \begin{alertblock}<1->{Step 3 — Coming next}
+        \textcolor{gray!60}{\small R8 and R9 will match\ldots}
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+%% ── SEARCH SLIDE 3 of 4 ─────────────────────────────────────
+\begin{frame}{Simulation: Search — Step 3, R8 \& R9 Match}
+  \begin{columns}[c]
+    \column{0.56\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.66]
+      \spatialgrid{8.8}{5.2}
+      \fill[blue!22,  draw=blue!55, thick] (0.5,0.9)  rectangle (1.9,2.0); \node[font=\tiny] at(1.2,1.45){Obj1};
+      \fill[blue!22,  draw=blue!55, thick] (0.8,3.0)  rectangle (2.2,4.2); \node[font=\tiny] at(1.5,3.6){Obj2};
+      \fill[green!25, draw=green!60!black, thick] (3.4,0.7)  rectangle (4.8,2.0); \node[font=\tiny] at(4.1,1.35){Obj3};
+      \fill[green!25, draw=green!60!black, thick] (3.9,2.8)  rectangle (5.6,4.2); \node[font=\tiny] at(4.75,3.5){Obj4};
+      % R10 objects — ghost
+      \fill[orange!10, draw=orange!30, thick, ghost] (6.4,0.9) rectangle (8.2,2.6);
+      \fill[orange!10, draw=orange!30, thick, ghost] (6.8,3.3) rectangle (8.4,4.7);
+      % query
+      \draw[PRI, very thick] (1.4,1.8) rectangle (5.2,4.8);
+      \node[PRI, font=\small\bfseries] at(3.3,5.15){$S$ (query)};
+      % R8 and R9 highlighted
+      \fill[PRI!12] (0.4,0.8) rectangle (2.3,4.3);
+      \draw[PRI, very thick] (0.4,0.8) rectangle (2.3,4.3);
+      \node[PRI, font=\small\bfseries] at(1.35,4.5){R8 \checkmark};
+      \fill[PRI!12] (3.3,0.6) rectangle (5.7,4.3);
+      \draw[PRI, very thick] (3.3,0.6) rectangle (5.7,4.3);
+      \node[PRI, font=\small\bfseries] at(4.5,4.5){R9 \checkmark};
+      % R10 MBR — ghost
+      \draw[orange!30, mbr, thick, dashed, ghost] (6.3,0.8) rectangle (8.5,4.8);
+      \node[orange!30, font=\small\bfseries, ghost] at(7.4,5.0){R10};
+      % ghost cross for next step
+      \draw[PRI!30, very thick, ghost] (6.3,0.8) -- (8.5,4.8);
+      \draw[PRI!30, very thick, ghost] (6.3,4.8) -- (8.5,0.8);
+    \end{tikzpicture}
+    \end{center}
+    \column{0.40\textwidth}
+      \begin{exampleblock}{Step 3 — R8 and R9 match}
+        Both MBRs overlap $S$.\\
+        \textbf{Descend into both} subtrees and report overlapping objects.
+      \end{exampleblock}
+      \vspace{0.4em}
+      \begin{alertblock}<1->{Step 4 — Coming next}
+        \textcolor{gray!60}{\small R10 will be pruned entirely\ldots}
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+%% ── SEARCH SLIDE 4 of 4 ─────────────────────────────────────
+\begin{frame}{Simulation: Search — Step 4, R10 Pruned}
+  \begin{columns}[c]
+    \column{0.56\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.66]
+      \spatialgrid{8.8}{5.2}
+      \fill[blue!22,  draw=blue!55, thick] (0.5,0.9)  rectangle (1.9,2.0); \node[font=\tiny] at(1.2,1.45){Obj1};
+      \fill[blue!22,  draw=blue!55, thick] (0.8,3.0)  rectangle (2.2,4.2); \node[font=\tiny] at(1.5,3.6){Obj2};
+      \fill[green!25, draw=green!60!black, thick] (3.4,0.7)  rectangle (4.8,2.0); \node[font=\tiny] at(4.1,1.35){Obj3};
+      \fill[green!25, draw=green!60!black, thick] (3.9,2.8)  rectangle (5.6,4.2); \node[font=\tiny] at(4.75,3.5){Obj4};
+      % query
+      \draw[PRI, very thick] (1.4,1.8) rectangle (5.2,4.8);
+      \node[PRI, font=\small\bfseries] at(3.3,5.15){$S$};
+      % R8 and R9 highlighted
+      \fill[PRI!12] (0.2,0.6) rectangle (2.5,4.5);
+      \draw[PRI, very thick] (0.2,0.6) rectangle (2.5,4.5);
+      \node[PRI, font=\small\bfseries] at(1.35,4.85){R8 \checkmark};
+      \fill[PRI!12] (3.1,0.4) rectangle (5.9,4.5);
+      \draw[PRI, very thick] (3.1,0.4) rectangle (5.9,4.5);
+      \node[PRI, font=\small\bfseries] at(4.5,4.85){R9 \checkmark};
+      % R10 — greyed out and crossed
+      \fill[white, opacity=0.7] (6.3,0.8) rectangle (8.5,4.8);
+      \fill[gray!8]             (6.3,0.8) rectangle (8.5,4.8);
+      \draw[gray!40, mbr, thick, dashed] (6.3,0.8) rectangle (8.5,4.8);
+      \draw[PRI!70, very thick, line cap=round] (6.3,0.8) -- (8.5,4.8);
+      \draw[PRI!70, very thick, line cap=round] (6.3,4.8) -- (8.5,0.8);
+      \node[PRI!80, font=\small\bfseries] at(7.4,5.0){R10 PRUNED};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.40\textwidth}
+      \begin{exampleblock}{Step 4 — R10 pruned}
+        $R10 \cap S = \emptyset$\\[0.3em]
+        Skip the \textbf{entire} R10 subtree.\\
+        \textbf{Zero extra disk reads!}
+      \end{exampleblock}
+      \vspace{0.5em}
+      \begin{block}{Key lesson}
+        Good MBRs $\Rightarrow$ more pruning\\
+        $\Rightarrow$ fewer disk reads\\
+        $\Rightarrow$ \alert{faster queries}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+% =============================================================
+\section{Insertion \& Node Splitting}
+% =============================================================
+
+\begin{frame}{Insertion — Overview}
+  \begin{columns}[T]
+    \column{0.52\textwidth}
+    \begin{enumerate}
+      \item<1-> \textbf{ChooseLeaf} — pick child needing \alert{least MBR enlargement}
+      \item<2-> \textbf{Insert} entry into chosen leaf
+      \item<3-> If leaf has $> M$ entries: \alert{SplitNode}
+      \item<4-> \textbf{AdjustTree} — update ancestor MBRs upward
+      \item<5-> If root split: create \alert{new root} one level higher
+    \end{enumerate}
+    \column{0.44\textwidth}
+      \begin{alertblock}<3->{The critical step}
+        Quality of \textbf{node splitting} drives future search performance.\\[0.2em]
+        Goal: small, non-overlapping MBRs.
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+%% ── CHOOSELEAF: 3 steps ─────────────────────────────────────
+\begin{frame}{Simulation: ChooseLeaf — Step 1, New Object Arrives}
+  \begin{columns}[c]
+    \column{0.54\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.64]
+      \spatialgrid{8.5}{5.0}
+      \fill[blue!22, draw=blue!55, thick]           (0.4,0.8) rectangle (1.8,2.0);
+      \fill[blue!22, draw=blue!55, thick]           (0.7,3.1) rectangle (2.1,4.2);
+      \fill[green!25,draw=green!60!black, thick]    (3.3,0.7) rectangle (4.7,2.0);
+      \fill[green!25,draw=green!60!black, thick]    (3.8,2.9) rectangle (5.5,4.1);
+      \fill[orange!25,draw=orange!75, thick]        (6.3,0.8) rectangle (8.0,2.5);
+      \fill[orange!25,draw=orange!75, thick]        (6.7,3.2) rectangle (8.2,4.5);
+      % existing MBRs
+      \draw[blue, mbr, thick, dashed]             (0.3,0.7) rectangle (2.2,4.3);
+      \node[blue,font=\tiny\bfseries]             at(1.25,4.5){R8};
+      \draw[green!60!black, mbr, thick, dashed]   (3.2,0.6) rectangle (5.6,4.2);
+      \node[green!60!black,font=\tiny\bfseries]   at(4.4,4.4){R9};
+      \draw[orange!75, mbr, thick, dashed]        (6.2,0.7) rectangle (8.3,4.6);
+      \node[orange!75,font=\tiny\bfseries]        at(7.25,4.8){R10};
+      % NEW object
+      \fill[PRI!70, draw=PRI, very thick, rounded corners=1pt] (3.6,4.6) rectangle (5.0,5.2);
+      \node[white, font=\tiny\bfseries] at(4.3,4.9){Obj7 NEW};
+      % ghost arrows
+      \draw[blue,ghost,thick,->]           (1.25,4.3) -- (3.5,5.1);
+      \draw[green!60!black,ghost,thick,->] (4.3,4.22) -- (3.65,4.6);
+      \draw[orange!75,ghost,thick,->]      (7.25,4.6) -- (5.1,5.1);
+    \end{tikzpicture}
+    \end{center}
+    \column{0.42\textwidth}
+      \begin{block}{Step 1 — Obj7 arrives}
+        Must find the best leaf node to insert into.
+      \end{block}
+      \vspace{0.3em}
+      \begin{alertblock}<1->{Step 2 — Coming next}
+        \textcolor{gray!60}{\small Compute enlargements for each group\ldots}
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Simulation: ChooseLeaf — Step 2, Compare Enlargements}
+  \begin{columns}[c]
+    \column{0.54\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.64]
+      \spatialgrid{8.5}{5.4}
+      \fill[blue!22, draw=blue!55, thick]           (0.4,0.8) rectangle (1.8,2.0);
+      \fill[blue!22, draw=blue!55, thick]           (0.7,3.1) rectangle (2.1,4.2);
+      \fill[green!25,draw=green!60!black, thick]    (3.3,0.7) rectangle (4.7,2.0);
+      \fill[green!25,draw=green!60!black, thick]    (3.8,2.9) rectangle (5.5,4.1);
+      \fill[orange!25,draw=orange!75, thick]        (6.3,0.8) rectangle (8.0,2.5);
+      \fill[orange!25,draw=orange!75, thick]        (6.7,3.2) rectangle (8.2,4.5);
+      \draw[blue, mbr, thick, dashed]             (0.3,0.7) rectangle (2.2,4.3);
+      \node[blue,font=\tiny\bfseries]             at(1.25,4.5){R8};
+      \draw[green!60!black, mbr, thick, dashed]   (3.2,0.6) rectangle (5.6,4.2);
+      \node[green!60!black,font=\tiny\bfseries]   at(4.4,4.4){R9};
+      \draw[orange!75, mbr, thick, dashed]        (6.2,0.7) rectangle (8.3,4.6);
+      \node[orange!75,font=\tiny\bfseries]        at(7.25,4.8){R10};
+      \fill[PRI!70, draw=PRI, very thick, rounded corners=1pt] (3.6,4.6) rectangle (5.0,5.2);
+      \node[white, font=\tiny\bfseries] at(4.3,4.9){Obj7};
+      % enlargement arrows — SOLID
+      \draw[blue,thick,->]           (1.25,4.3) -- (3.5,5.1);
+      \node[blue,font=\tiny,align=center] at(0.5,4.9){R8\\{\scriptsize big}};
+      \draw[green!60!black,very thick,->] (4.3,4.22) -- (3.65,4.6);
+      \node[green!60!black,font=\footnotesize\bfseries] at(4.4,0.25){\checkmark min};
+      \draw[orange!75,thick,->]      (7.25,4.6) -- (5.1,5.1);
+      \node[orange!75,font=\tiny,align=center] at(8.1,4.85){R10\\{\scriptsize big}};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.42\textwidth}
+      \begin{block}{Step 2 — Enlargements}
+        R8: large growth needed\\
+        \alert{R9: minimal growth} \checkmark\\
+        R10: large growth needed
+      \end{block}
+      \vspace{0.3em}
+      \begin{alertblock}<1->{Step 3 — Coming next}
+        \textcolor{gray!60}{\small Insert into R9 and update MBR\ldots}
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Simulation: ChooseLeaf — Step 3, Insert into R9}
+  \begin{columns}[c]
+    \column{0.54\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.64]
+      \spatialgrid{8.5}{5.4}
+      \fill[blue!22, draw=blue!55, thick]           (0.4,0.8) rectangle (1.8,2.0);
+      \fill[blue!22, draw=blue!55, thick]           (0.7,3.1) rectangle (2.1,4.2);
+      \fill[green!25,draw=green!60!black, thick]    (3.3,0.7) rectangle (4.7,2.0);
+      \fill[green!25,draw=green!60!black, thick]    (3.8,2.9) rectangle (5.5,4.1);
+      \fill[orange!25,draw=orange!75, thick]        (6.3,0.8) rectangle (8.0,2.5);
+      \fill[orange!25,draw=orange!75, thick]        (6.7,3.2) rectangle (8.2,4.5);
+      \draw[blue, mbr, thick, dashed]             (0.3,0.7) rectangle (2.2,4.3);
+      \node[blue,font=\tiny\bfseries]             at(1.25,4.5){R8};
+      \draw[orange!75, mbr, thick, dashed]        (6.2,0.7) rectangle (8.3,4.6);
+      \node[orange!75,font=\tiny\bfseries]        at(7.25,4.8){R10};
+      % Obj7 inserted
+      \fill[PRI!70, draw=PRI, very thick, rounded corners=1pt] (3.6,4.6) rectangle (5.0,5.2);
+      \node[white, font=\tiny\bfseries] at(4.3,4.9){Obj7};
+      % EXPANDED R9 MBR
+      \draw[green!60!black, very thick] (3.2,0.6) rectangle (5.6,5.3);
+      \node[green!60!black,font=\small\bfseries] at(4.4,5.6){R9 (expanded)};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.42\textwidth}
+      \begin{exampleblock}{Step 3 — Inserted!}
+        R9 = \{Obj3, Obj4, \textbf{Obj7}\}\\
+        3 entries $= M$. No split.\\[0.3em]
+        MBR updated to wrap Obj7.
+      \end{exampleblock}
+  \end{columns}
+\end{frame}
+
+% =============================================================
+%  QUAD SPLIT DEEP DIVE
+% =============================================================
+
+\begin{frame}{Node Splitting — Three Algorithms}
+  \begin{columns}[T]
+    \column{0.3\textwidth}
+      \begin{block}{Exhaustive}
+        All $2^M$ groupings.\\
+        Optimal quality.\\
+        $O(2^M)$ — too slow.
+      \end{block}
+    \column{0.3\textwidth}
+      \begin{alertblock}{Quadratic \textit{(focus)}}
+        Heuristic seeds.\\
+        Good quality.\\
+        $O(M^2)$ per split.
+      \end{alertblock}
+    \column{0.3\textwidth}
+      \begin{block}{Linear}
+        Axis extremes.\\
+        Acceptable quality.\\
+        $O(M)$ — fastest.
+      \end{block}
+  \end{columns}
+  \vspace{0.6em}
+  \begin{block}{Goal of any split}
+    Two nodes with \alert{small, minimally overlapping} MBRs.\\
+    Better split $\Rightarrow$ better search pruning $\Rightarrow$ fewer disk reads.
+  \end{block}
+\end{frame}
+
+%% ── PICKSEED step 1 ─────────────────────────────────────────
+\begin{frame}{Quadratic Split — Step 1: PickSeeds, Meet the Entries}
+  \begin{columns}[c]
+    \column{0.50\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.82]
+      \draw[LG!70, very thin, step=1] (0,0) grid (7,5.4);
+      \draw[-{Stealth[scale=0.7]}](0,0)--(7.3,0) node[right,font=\tiny]{$x$};
+      \draw[-{Stealth[scale=0.7]}](0,0)--(0,5.6) node[above,font=\tiny]{$y$};
+      % 4 entries
+      \fill[blue!28,  draw=blue!70,  thick, rounded corners=1pt] (0.3,3.4) rectangle (2.0,5.0);
+      \node[font=\normalsize\bfseries] at(1.15,4.2){A};
+      \fill[green!28, draw=green!65!black, thick, rounded corners=1pt] (0.3,0.3) rectangle (2.0,1.8);
+      \node[font=\normalsize\bfseries] at(1.15,1.05){B};
+      \fill[orange!32,draw=orange!80!black, thick, rounded corners=1pt] (4.8,3.4) rectangle (6.7,5.1);
+      \node[font=\normalsize\bfseries] at(5.75,4.25){C};
+      \fill[purple!28,draw=purple!70, thick, rounded corners=1pt] (4.8,0.3) rectangle (6.7,1.8);
+      \node[font=\normalsize\bfseries] at(5.75,1.05){D};
+      % ghost: worst-pair MBR coming next
+      \draw[PRI, very thick, dashed, ghost] (0.1,0.1) rectangle (6.9,5.3);
+    \end{tikzpicture}
+    \end{center}
+    \column{0.46\textwidth}
+      \begin{block}{Overflowing node}
+        4 entries: A, B, C, D ($> M = 3$).\\[0.3em]
+        Must split into two groups.
+      \end{block}
+      \vspace{0.3em}
+      \begin{block}{PickSeeds formula}
+        For every pair $(E_i, E_j)$:
+        {\small\[d = \text{area}(E_i \cup E_j) - \text{area}(E_i) - \text{area}(E_j)\]}
+        Choose pair with \alert{largest $d$} (most wasted space).
+      \end{block}
+  \end{columns}
+\end{frame}
+
+%% ── PICKSEED step 2 ─────────────────────────────────────────
+\begin{frame}{Quadratic Split — Step 2: PickSeeds, Worst Pair Found}
+  \begin{columns}[c]
+    \column{0.50\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.82]
+      \draw[LG!70, very thin, step=1] (0,0) grid (7,5.4);
+      \draw[-{Stealth[scale=0.7]}](0,0)--(7.3,0) node[right,font=\tiny]{$x$};
+      \draw[-{Stealth[scale=0.7]}](0,0)--(0,5.6) node[above,font=\tiny]{$y$};
+      % non-seed entries ghost
+      \fill[green!12, draw=green!35, thick, rounded corners=1pt, ghost] (0.3,0.3) rectangle (2.0,1.8);
+      \node[font=\normalsize\bfseries, ghost] at(1.15,1.05){B};
+      \fill[orange!14,draw=orange!35, thick, rounded corners=1pt, ghost] (4.8,3.4) rectangle (6.7,5.1);
+      \node[font=\normalsize\bfseries, ghost] at(5.75,4.25){C};
+      % seeds SOLID + highlighted
+      \fill[blue!28,  draw=PRI, very thick, rounded corners=1pt] (0.3,3.4) rectangle (2.0,5.0);
+      \node[font=\normalsize\bfseries, PRI] at(1.15,4.2){\textbf{A}};
+      \fill[purple!28,draw=PRI, very thick, rounded corners=1pt] (4.8,0.3) rectangle (6.7,1.8);
+      \node[font=\normalsize\bfseries, PRI] at(5.75,1.05){\textbf{D}};
+      % worst-pair MBR
+      \fill[PRI!8] (0.1,0.1) rectangle (6.9,5.3);
+      \draw[PRI, very thick, dashed, rounded corners=2pt] (0.1,0.1) rectangle (6.9,5.3);
+      \node[PRI, font=\small\bfseries] at(3.5,-0.4){MBR$(A \cup D)$ = max wasted area};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.46\textwidth}
+      \begin{exampleblock}{Seeds: A and D}
+        Diagonally opposite — their joint MBR wastes the most space.\\[0.3em]
+        $s_1 = A \to G_1$\\
+        $s_2 = D \to G_2$
+      \end{exampleblock}
+      \vspace{0.3em}
+      \begin{alertblock}<1->{Next — PickNext}
+        \textcolor{gray!60}{\small Assign B and C to their preferred group\ldots}
+      \end{alertblock}
+  \end{columns}
+\end{frame}
+
+%% ── PICKNEXT ────────────────────────────────────────────────
+\begin{frame}{Quadratic Split — Step 3: PickNext, Assign Remaining}
+  \begin{columns}[c]
+    \column{0.50\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.82]
+      \draw[LG!70, very thin, step=1] (0,0) grid (7,5.4);
+      \draw[-{Stealth[scale=0.7]}](0,0)--(7.3,0) node[right,font=\tiny]{$x$};
+      \draw[-{Stealth[scale=0.7]}](0,0)--(0,5.6) node[above,font=\tiny]{$y$};
+      % all 4 entries
+      \fill[blue!28,  draw=blue!70,  thick, rounded corners=1pt] (0.3,3.4) rectangle (2.0,5.0);
+      \node[font=\normalsize\bfseries] at(1.15,4.2){A};
+      \fill[green!28, draw=green!65!black, thick, rounded corners=1pt] (0.3,0.3) rectangle (2.0,1.8);
+      \node[font=\normalsize\bfseries] at(1.15,1.05){B};
+      \fill[orange!32,draw=orange!80!black, thick, rounded corners=1pt] (4.8,3.4) rectangle (6.7,5.1);
+      \node[font=\normalsize\bfseries] at(5.75,4.25){C};
+      \fill[purple!28,draw=purple!70, thick, rounded corners=1pt] (4.8,0.3) rectangle (6.7,1.8);
+      \node[font=\normalsize\bfseries] at(5.75,1.05){D};
+      % G1 MBR (A only so far)
+      \draw[blue!80!black, thick, dashed] (0.1,3.2) rectangle (2.2,5.2);
+      \node[blue!80!black,font=\tiny\bfseries] at(1.15,5.45){$G_1$};
+      % G2 MBR (D only)
+      \draw[purple!80, thick, dashed] (4.6,0.1) rectangle (6.9,2.0);
+      \node[purple!80,font=\tiny\bfseries] at(5.75,-0.3){$G_2$};
+      % preference arrows
+      \draw[-{Stealth}, green!65!black, very thick] (1.15,1.8) -- (1.15,3.2)
+            node[midway, right, font=\tiny]{B $\to G_1$};
+      \draw[-{Stealth}, orange!80!black, very thick] (5.75,3.4) -- (5.75,2.0)
+            node[midway, right, font=\tiny]{C $\to G_2$};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.46\textwidth}
+      \begin{block}{Rule}
+        $\delta_i = \Delta\text{area}(G_1) - \Delta\text{area}(G_2)$\\[0.2em]
+        Assign entry with \alert{largest $|\delta_i|$} first.
+      \end{block}
+      \vspace{0.3em}
+      \begin{exampleblock}{Round 1 result}
+        B strongly prefers $G_1$ (near A).\\
+        C strongly prefers $G_2$ (near D).\\[0.2em]
+        Both assigned. \textbf{Split complete!}
+      \end{exampleblock}
+  \end{columns}
+\end{frame}
+
+%% ── FINAL GROUPS ────────────────────────────────────────────
+\begin{frame}{Quadratic Split — Step 4: Final Groups}
+  \begin{columns}[c]
+    \column{0.50\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.82]
+      \draw[LG!70, very thin, step=1] (0,0) grid (7,5.4);
+      \draw[-{Stealth[scale=0.7]}](0,0)--(7.3,0) node[right,font=\tiny]{$x$};
+      \draw[-{Stealth[scale=0.7]}](0,0)--(0,5.6) node[above,font=\tiny]{$y$};
+      \fill[blue!28,  draw=blue!70,  thick, rounded corners=1pt] (0.3,3.4) rectangle (2.0,5.0);
+      \node[font=\normalsize\bfseries] at(1.15,4.2){A};
+      \fill[green!28, draw=green!65!black, thick, rounded corners=1pt] (0.3,0.3) rectangle (2.0,1.8);
+      \node[font=\normalsize\bfseries] at(1.15,1.05){B};
+      \fill[orange!32,draw=orange!80!black, thick, rounded corners=1pt] (4.8,3.4) rectangle (6.7,5.1);
+      \node[font=\normalsize\bfseries] at(5.75,4.25){C};
+      \fill[purple!28,draw=purple!70, thick, rounded corners=1pt] (4.8,0.3) rectangle (6.7,1.8);
+      \node[font=\normalsize\bfseries] at(5.75,1.05){D};
+      % tight final MBRs
+      \draw[blue!80!black, very thick, rounded corners=2pt] (0.1,0.1) rectangle (2.2,5.2);
+      \node[blue!80!black,font=\small\bfseries] at(1.15,-0.45){Node 1};
+      \draw[purple!80!black, very thick, rounded corners=2pt] (4.6,0.1) rectangle (6.9,5.3);
+      \node[purple!80!black,font=\small\bfseries] at(5.75,-0.45){Node 2};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.46\textwidth}
+      \begin{exampleblock}{Result}
+        \textbf{Node 1}: \{A, B\} — left cluster\\
+        \textbf{Node 2}: \{C, D\} — right cluster\\[0.4em]
+        Compact, \alert{non-overlapping} MBRs.
+      \end{exampleblock}
+      \vspace{0.3em}
+      \begin{block}{AdjustTree}
+        Parent gets two new entries pointing to Node 1 and Node 2.\\
+        Ancestor MBRs updated upward.
+      \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Good Split vs Bad Split}
+  \begin{center}
+  \begin{tikzpicture}[scale=0.75]
+    \begin{scope}
+      \fill[blue!20,  draw=blue!50,  thick] (0.5,0.5) rectangle (1.5,1.5);
+      \fill[blue!20,  draw=blue!50,  thick] (0.5,3.2) rectangle (1.5,4.2);
+      \fill[green!20, draw=green!55!black, thick] (5.0,0.5) rectangle (6.5,1.5);
+      \fill[green!20, draw=green!55!black, thick] (5.0,3.2) rectangle (6.5,4.2);
+      \draw[PRI, very thick, dashed] (-0.3,0.0) rectangle (5.6,4.8);
+      \draw[PRI, very thick, dashed] (3.8,0.0) rectangle (7.0,4.8);
+      \fill[PRI!18, opacity=0.5] (3.8,0.0) rectangle (5.6,4.8);
+      \node[PRI,font=\bfseries] at(3.35,-0.65){\alert{Bad Split}};
+      \node[font=\footnotesize,align=center] at(3.35,-1.5){Large overlap\\$\Rightarrow$ query visits BOTH branches};
+    \end{scope}
+    \begin{scope}[xshift=9.8cm]
+      \fill[blue!20,  draw=blue!50,  thick] (0.5,0.5) rectangle (1.5,1.5);
+      \fill[blue!20,  draw=blue!50,  thick] (0.5,3.2) rectangle (1.5,4.2);
+      \fill[green!20, draw=green!55!black, thick] (5.0,0.5) rectangle (6.5,1.5);
+      \fill[green!20, draw=green!55!black, thick] (5.0,3.2) rectangle (6.5,4.2);
+      \draw[blue!75!black, very thick] (-0.1,0.2) rectangle (2.1,4.6);
+      \draw[green!60!black, very thick] (4.6,0.2) rectangle (7.0,4.6);
+      \node[green!60!black,font=\bfseries] at(3.5,-0.65){Good Split};
+      \node[font=\footnotesize,align=center] at(3.5,-1.5){No overlap\\$\Rightarrow$ query prunes one branch entirely};
+    \end{scope}
+  \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+\section{Full Insertion Walkthrough}
+
+\begin{frame}{Walkthrough — Setup}
+  R-tree with $M=3$, starting state:
+  \begin{center}
+  \begin{tikzpicture}[
+    level distance=1.2cm,
+    level 1/.style={sibling distance=3.5cm},
+    level 2/.style={sibling distance=1.6cm},
+  ]
+    \node[rootnode] {Root}
+      child {node[treenode, fill=blue!20, draw=blue!70]{R8}
+        child {node[leafnode, font=\tiny\bfseries]{Obj1}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj2}}
+      }
+      child {node[treenode, fill=green!20, draw=green!60!black]{R9}
+        child {node[leafnode, font=\tiny\bfseries]{Obj3}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj4}}
+      }
+      child {node[treenode, fill=orange!20, draw=orange!70]{R10}
+        child {node[leafnode, font=\tiny\bfseries]{Obj5}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj6}}
+      };
+  \end{tikzpicture}
+  \end{center}
+  \vspace{0.3em}
+  Plan: insert \textbf{Obj7} (near R9) — no overflow.\\
+  Then insert \textbf{Obj8} (near R9) — triggers \alert{overflow + split}.
+\end{frame}
+
+\begin{frame}{Walkthrough — Insert Obj7, R9 Updated}
+  \begin{columns}[T]
+    \column{0.46\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.62]
+      \spatialgrid{6.5}{5.0}
+      \fill[blue!22, draw=blue!55, thick]        (0.3,0.7) rectangle (1.5,1.8);
+      \fill[blue!22, draw=blue!55, thick]        (0.5,3.0) rectangle (1.8,4.2);
+      \fill[green!25,draw=green!60!black, thick] (2.7,0.5) rectangle (3.9,1.8);  \node[font=\tiny] at(3.3,1.15){Obj3};
+      \fill[green!25,draw=green!60!black, thick] (3.1,2.8) rectangle (4.7,4.0);  \node[font=\tiny] at(3.9,3.4){Obj4};
+      \fill[orange!25,draw=orange!70, thick]     (5.0,0.7) rectangle (6.3,2.2);
+      \fill[orange!25,draw=orange!70, thick]     (5.2,3.0) rectangle (6.3,4.1);
+      \draw[blue, mbr, thick, dashed]             (0.2,0.6) rectangle (1.9,4.3);
+      \draw[orange!70, mbr, thick, dashed]        (4.9,0.6) rectangle (6.4,4.2);
+      % Obj7
+      \fill[PRI!65, draw=PRI, thick, rounded corners=1pt] (3.2,4.4) rectangle (4.5,5.0);
+      \node[white,font=\tiny\bfseries] at(3.85,4.7){Obj7};
+      % Expanded R9
+      \draw[green!60!black, very thick] (2.6,0.4) rectangle (4.8,5.1);
+      \node[green!60!black,font=\small\bfseries] at(3.7,5.35){R9 (expanded)};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.50\textwidth}
+      \begin{block}{ChooseLeaf $\to$ R9}
+        R9 needs minimum enlargement.
+      \end{block}
+      \vspace{0.2em}
+      \begin{exampleblock}{Result — No Split}
+        R9 = \{Obj3, Obj4, Obj7\}\\
+        3 entries $= M$. Tree unchanged.
+      \end{exampleblock}
+      \vspace{0.2em}
+      \begin{center}
+        \scalebox{0.78}{%
+      \begin{tikzpicture}[
+        level distance=0.9cm,
+        level 1/.style={sibling distance=3.8cm},
+        level 2/.style={sibling distance=1.0cm},
+      ]
+        \node[rootnode,font=\tiny]{Root}
+          child{node[treenode,fill=blue!20,draw=blue!70,font=\tiny,minimum width=0.9cm]{R8}
+            child{node[leafnode,font=\tiny,minimum width=0.8cm]{O1}}
+            child{node[leafnode,font=\tiny,minimum width=0.8cm]{O2}}}
+          child{node[treenode,fill=green!20,draw=green!70!black,font=\tiny,minimum width=0.9cm]{R9}
+            child{node[leafnode,font=\tiny,minimum width=0.7cm]{O3}}
+            child{node[leafnode,font=\tiny,minimum width=0.7cm]{O4}}
+            child{node[leafnode,font=\tiny,minimum width=0.7cm,fill=PRI!35]{O7}}}
+          child{node[treenode,fill=orange!20,draw=orange!70,font=\tiny,minimum width=0.9cm]{R10}
+            child{node[leafnode,font=\tiny,minimum width=0.7cm]{O5}}
+            child{node[leafnode,font=\tiny,minimum width=0.7cm]{O6}}};
+      \end{tikzpicture}}
+      \end{center}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Walkthrough — Insert Obj8, Overflow!}
+  \begin{columns}[T]
+    \column{0.50\textwidth}
+    \begin{center}
+    \begin{tikzpicture}[scale=0.64]
+      \spatialgrid{6.5}{5.0}
+      \fill[green!25,draw=green!60!black, thick] (2.7,0.5) rectangle (3.9,1.8);  \node[font=\tiny] at(3.3,1.15){Obj3};
+      \fill[green!25,draw=green!60!black, thick] (3.1,2.8) rectangle (4.7,4.0);  \node[font=\tiny] at(3.9,3.4){Obj4};
+      \fill[PRI!60, draw=PRI, thick]             (3.2,4.3) rectangle (4.5,4.9);  \node[white,font=\tiny\bfseries] at(3.85,4.6){Obj7};
+      % Obj8 NEW
+      \fill[SEC!70, draw=SEC, very thick, rounded corners=1pt] (2.2,2.0) rectangle (3.5,3.1);
+      \node[white,font=\tiny\bfseries] at(2.85,2.55){Obj8 NEW};
+      \node[PRI, font=\footnotesize\bfseries] at(3.5,-0.4){R9 overflows! (4 entries)};
+      % split result
+      \draw[blue!80, very thick, rounded corners=2pt]   (2.0,0.3) rectangle (4.0,3.3);
+      \node[blue!80,font=\tiny\bfseries] at(3.0,3.6){R9a: \{Obj3, Obj8\}};
+      \draw[purple!75, very thick, rounded corners=2pt] (3.0,2.6) rectangle (4.8,5.1);
+      \node[purple!75,font=\tiny\bfseries] at(3.9,5.35){R9b: \{Obj4, Obj7\}};
+    \end{tikzpicture}
+    \end{center}
+    \column{0.46\textwidth}
+      \begin{alertblock}{Overflow}
+        R9 would have 4 entries $> M=3$.\\
+        \textbf{SplitNode} triggered.
+      \end{alertblock}
+      \vspace{0.3em}
+      \begin{block}{Quadratic split result}
+        Seeds: Obj3 \& Obj7 (max wasted area).\\[0.2em]
+        \textbf{R9a} = \{Obj3, Obj8\}\\
+        \textbf{R9b} = \{Obj4, Obj7\}
+      \end{block}
+      \vspace{0.3em}
+      \begin{exampleblock}{AdjustTree}
+        Root gains R9a and R9b.\\
+        4 children total — still $\le M$.
+      \end{exampleblock}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Walkthrough — Final Tree After Split}
+  \begin{center}
+  \begin{tikzpicture}[
+    level distance=1.2cm,
+    level 1/.style={sibling distance=3.2cm},
+    level 2/.style={sibling distance=1.6cm},
+  ]
+    \node[rootnode] {Root}
+      child {node[treenode, fill=blue!20,   draw=blue!70]   {R8}
+        child {node[leafnode, font=\tiny\bfseries]{Obj1}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj2}}}
+      child {node[treenode, fill=blue!28,   draw=blue!80]   {R9a}
+        child {node[leafnode, font=\tiny\bfseries]{Obj3}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj8}}}
+      child {node[treenode, fill=purple!20, draw=purple!70] {R9b}
+        child {node[leafnode, font=\tiny\bfseries]{Obj4}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj7}}}
+      child {node[treenode, fill=orange!20, draw=orange!70] {R10}
+        child {node[leafnode, font=\tiny\bfseries]{Obj5}}
+        child {node[leafnode, font=\tiny\bfseries]{Obj6}}};
+  \end{tikzpicture}
+  \end{center}
+  \vspace{0.3em}
+  Root now has 4 children. Tree height unchanged.
+  All MBRs compact thanks to the quadratic split.
+\end{frame}
+
+% =============================================================
+\section{Deletion}
+% =============================================================
+
+\begin{frame}{Deletion Algorithm}
+  \begin{columns}[T]
+    \column{0.52\textwidth}
+    \begin{enumerate}
+      \item<1-> \textbf{FindLeaf} — locate the leaf containing $E$
+      \item<2-> \textbf{Remove} $E$ from that leaf
+      \item<3-> \textbf{CondenseTree} — if node has $< m$ entries:\\
+            \quad delete it; \alert{re-insert} orphaned entries
+      \item<4-> Propagate MBR shrinkage upward
+      \item<5-> If root has one child: shrink tree height
+    \end{enumerate}
+    \column{0.44\textwidth}
+      \begin{block}<3->{Why re-insert, not merge?}
+        \begin{itemize}
+          \item Reuses Insert logic
+          \item Entries find natural home
+          \item Gradually \alert{improves} structure
+          \item Simpler than spatial merge
+        \end{itemize}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+% =============================================================
+\section{Key Takeaways}
+% =============================================================
+
+\begin{frame}{Summary}
+  \begin{columns}[T]
+    \column{0.48\textwidth}
+      \begin{block}{What we covered}
+        \begin{enumerate}
+          \item MBRs group nearby spatial objects
+          \item Search prunes non-overlapping subtrees
+          \item ChooseLeaf: least-enlargement heuristic
+          \item Quadratic split: PickSeeds $+$ PickNext
+          \item Split quality drives search efficiency
+          \item Deletion re-inserts orphaned entries
+        \end{enumerate}
+      \end{block}
+    \column{0.48\textwidth}
+      \begin{alertblock}{The golden rule}
+        \centering\vspace{0.2em}
+        \large
+        Minimise \textbf{overlap} and \textbf{area} of MBRs at every split.
+        \vspace{0.2em}
+      \end{alertblock}
+      \vspace{0.4em}
+      \begin{exampleblock}{Used in practice}
+        PostgreSQL/PostGIS, QGIS,\\
+        ArcGIS, game engines,\\
+        GEOS, Shapely, SQLite R*
+      \end{exampleblock}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{References}
+  \begin{thebibliography}{10}
+  \beamertemplatearticlebibitems
+  \bibitem{Guttman1984}
+  Antonin Guttman
+  \newblock \textit{R-Trees: A Dynamic Index Structure for Spatial Searching}
+  \newblock ACM SIGMOD, 1984
+
+  \beamertemplatearticlebibitems
+  \bibitem{Wikipedia}
+  Wikipedia contributors
+  \newblock \textit{R-tree} ---
+  \texttt{en.wikipedia.org/wiki/R-tree}
+  \end{thebibliography}
+\end{frame}
+
+\begin{frame}[plain]
+\begin{tikzpicture}[remember picture, overlay]
+
+  %% White background
+  \fill[white]
+    (current page.south west) rectangle (current page.north east);
+
+  %% Subtle dot grid (dark on white)
+  \foreach \x in {0.5,1.5,...,15.5} {
+    \foreach \y in {0.3,1.0,...,8.5} {
+      \fill[darkGray, opacity=0.05] (\x,\y) circle (1pt);
+    }
+  }
+
+  %% Big decorative R-tree diagram (background art, red-tinted)
+  \begin{scope}[opacity=0.06, xshift=1cm, yshift=1.2cm]
+    \draw[PRI, very thick] (2,4.5) -- (0.5,2.5);
+    \draw[PRI, very thick] (2,4.5) -- (3.5,2.5);
+    \draw[PRI, very thick] (0.5,2.5) -- (-0.5,0.8);
+    \draw[PRI, very thick] (0.5,2.5) -- (1.5,0.8);
+    \draw[PRI, very thick] (3.5,2.5) -- (2.5,0.8);
+    \draw[PRI, very thick] (3.5,2.5) -- (4.5,0.8);
+    \draw[PRI, very thick, rounded corners=4pt] (1.3,4.2) rectangle (2.7,4.9);
+    \draw[PRI, very thick, rounded corners=3pt] (-0.2,2.2) rectangle (1.2,2.9);
+    \draw[PRI, very thick, rounded corners=3pt] (2.8,2.2) rectangle (4.2,2.9);
+    \draw[PRI, very thick, rounded corners=2pt] (-1.2,0.4) rectangle (0.2,1.1);
+    \draw[PRI, very thick, rounded corners=2pt] (0.8,0.4) rectangle (2.2,1.1);
+    \draw[PRI, very thick, rounded corners=2pt] (1.8,0.4) rectangle (3.2,1.1);
+    \draw[PRI, very thick, rounded corners=2pt] (3.8,0.4) rectangle (5.2,1.1);
+  \end{scope}
+
+  %% Left red accent bar
+  \fill[PRI]
+    (current page.south west) rectangle
+    ([xshift=0.012\paperwidth] current page.north west);
+
+  %% Top red accent bar
+  \fill[PRI]
+    ([yshift=-0.012\paperheight] current page.north west) rectangle
+    (current page.north east);
+
+  %% Central "Thank You" — dark red on white
+  \node[
+    text=PRI,
+    font=\Huge\bfseries,
+    anchor=center,
+    scale=1.6
+  ] at ([yshift=0.10\paperheight] current page.center) {Thank You};
+
+  %% Subtitle
+  \node[
+    text=medGray,
+    font=\large,
+    anchor=center
+  ] at ([yshift=-0.02\paperheight] current page.center)
+    {Questions \& Discussion};
+
+  %% Separator
+  \draw[PRI, line width=1.5pt]
+    ([xshift=-0.25\paperwidth, yshift=0.03\paperheight] current page.center) --
+    ([xshift= 0.25\paperwidth, yshift=0.03\paperheight] current page.center);
+
+  %% Team credit strip at bottom — light red tint
+  \fill[PRI, opacity=0.08]
+    (current page.south west) rectangle
+    ([yshift=0.14\paperheight] current page.south east);
+  \draw[PRI, opacity=0.25, line width=0.6pt]
+    ([yshift=0.14\paperheight] current page.south west) --
+    ([yshift=0.14\paperheight] current page.south east);
+
+  \node[text=darkGray, font=\scriptsize, anchor=west] at
+    ([xshift=0.05\paperwidth, yshift=0.07\paperheight] current page.south west)
+    {\textbf{Farhan Labib} \quad\texttt{2205071}
+     \quad{\color{PRI}$\bullet$}\quad
+     \textbf{Fatima Sad Sudipta} \quad\texttt{2205063}};
+
+  \node[text=medGray, font=\tiny\itshape, anchor=east] at
+    ([xshift=-0.05\paperwidth, yshift=0.07\paperheight] current page.south east)
+    {Bangladesh University of Engineering \& Technology};
+
+  %% Small BUET logo bottom right
+  \node[anchor=south east, inner sep=8pt] at
+    ([yshift=0.14\paperheight] current page.south east)
+    {\includegraphics[height=0.55cm]{BUET_LOGO.png}};
+
+\end{tikzpicture}
+\end{frame}
+
+\end{document}

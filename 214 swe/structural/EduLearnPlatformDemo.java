@@ -101,42 +101,59 @@ public class EduLearnPlatformDemo {
     }
 
     private static void applyAddonsToItems() {
+
         if (cart.isEmpty()) {
             System.out.println(RED + "\nCart is empty. Add items first." + RESET);
             return;
         }
-        System.out.println(PURPLE + "\n============= ADD OPTIONAL SERVICES =============" + RESET);
+
+        System.out.println(PURPLE + "\n============= ADD OPTIONAL SERVICES (MODULE ONLY) =============" + RESET);
+
         List<PurchaseableItem> items = cart.getItems();
 
         for (int i = 0; i < items.size(); i++) {
-            System.out.println((i + 1) + ". " + CYAN + items.get(i).getName() + RESET);
+            PurchaseableItem item = items.get(i);
+            String type = (item instanceof Module) ? "[Module]" : (item instanceof Course) ? "[Course]" : "[Lesson]";
+            System.out.println((i + 1) + ". " + CYAN + type + " " + item.getName() + RESET);
         }
 
         try {
             System.out.print(YELLOW + "\nEnter item number: " + RESET);
             int itemIdx = Integer.parseInt(scanner.nextLine()) - 1;
 
-            if (itemIdx >= 0 && itemIdx < items.size()) {
-                System.out.println("\n1. Practice Question Set " + GREEN + "($10)" + RESET);
-                System.out.println("2. Live Mentor Support " + GREEN + "($20)" + RESET);
-                System.out.print(YELLOW + "Choice: " + RESET);
-                String addonChoice = scanner.nextLine();
-                PurchaseableItem selectedItem = items.get(itemIdx);
-                cart.removeItem(selectedItem);
-
-                if (addonChoice.equals("1")) {
-                    cart.addItem(new PracticeSetAddon(selectedItem));
-                    System.out.println(GREEN + ">> Practice Set successfully attached." + RESET);
-                } else if (addonChoice.equals("2")) {
-                    cart.addItem(new LiveMentorSupportAddon(selectedItem));
-                    System.out.println(GREEN + ">> Live Mentor Support activated." + RESET);
-                } else {
-                    cart.addItem(selectedItem);
-                    System.out.println(RED + "!! Invalid selection !!" + RESET);
-                }
+            if (itemIdx < 0 || itemIdx >= items.size()) {
+                System.out.println(RED + "Invalid item selection." + RESET);
+                return;
             }
+
+            PurchaseableItem selectedItem = items.get(itemIdx);
+
+            if (!(selectedItem instanceof Module)) {
+                System.out.println(RED + "\nAdd-ons can ONLY be applied to Modules!" + RESET);
+                return;
+            }
+
+            System.out.println("\n1. Practice Question Set " + GREEN + "($10)" + RESET);
+            System.out.println("2. Live Mentor Support " + GREEN + "($20)" + RESET);
+            System.out.print(YELLOW + "Choice: " + RESET);
+
+            String addonChoice = scanner.nextLine();
+
+            cart.removeItem(selectedItem);
+
+            if (addonChoice.equals("1")) {
+                cart.addItem(new PracticeSetAddon(selectedItem));
+                System.out.println(GREEN + ">> Practice Set successfully attached to Module." + RESET);
+            } else if (addonChoice.equals("2")) {
+                cart.addItem(new LiveMentorSupportAddon(selectedItem));
+                System.out.println(GREEN + ">> Live Mentor Support activated for Module." + RESET);
+            } else {
+                cart.addItem(selectedItem);
+                System.out.println(RED + "Invalid selection." + RESET);
+            }
+
         } catch (Exception e) {
-            System.out.println(RED + "!! Error: Please enter a valid number !!" + RESET);
+            System.out.println(RED + "Error: Please enter a valid number." + RESET);
         }
     }
 
