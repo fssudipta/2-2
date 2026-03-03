@@ -2,6 +2,8 @@ import tkinter as tk
 import numpy as np
 import math
 from discrete_framework import DiscreteSignal, DFTAnalyzer, FastFourierTransform
+from advanced_fft import ArbitraryFFTAnalyzer
+import time 
 
 class DoodlingApp:
     def __init__(self, root):
@@ -77,16 +79,21 @@ class DoodlingApp:
         # 1. Convert (x,y) points to Complex Signal
         z_data = [complex(p[0], p[1]) for p in self.points]
         signal = DiscreteSignal(z_data)
+        N_orig = len(signal)
+        new_N = 2**(int(np.ceil(np.log2(N_orig))))
+        signal = signal.interpolate(new_N)
         # 2. Select Algorithm 
         if self.use_fft.get():
-            analyzer = FastFourierTransform()
-            N_orig = len(signal)
-            new_N = 2**(int(np.ceil(np.log2(N_orig))))
-            signal = signal.interpolate(new_N)
+            #analyzer = FastFourierTransform()
+            analyzer = ArbitraryFFTAnalyzer()
+            print("fft")
         else: 
             analyzer=DFTAnalyzer()
+            print("dft")
         # 3. Compute Transform
+        t0 = time.time()
         coeffs = analyzer.compute_dft(signal)
+        print(f"transform took: {time.time()-t0:.4f}s")
         N = len(coeffs)
 
         mean_val = coeffs[0]/N
@@ -94,25 +101,32 @@ class DoodlingApp:
 
         self.fourier_coeffs = []
         for k in range(N):
+            """if k <= N//2:
+                freq = k
+            else:
+                freq = k-N"""
+            freq = k
             self.fourier_coeffs.append({
-                'freq': k,
+                'freq': freq,
                 'radius': np.abs(coeffs[k])/N,
                 'phase': np.angle(coeffs[k])
             })
         self.fourier_coeffs.sort(key=lambda c: c['radius'], reverse=True)
+        self.transform_N = N
         self.canvas.delete("trail")
         self.path_trail=[]
 
         self.animate_epicycles(mean_point)
         
-        print("Transform logic needed.")
+        print("Transform logic done.")
         # self.animate_epicycles(mean_point)
 
     def animate_epicycles(self, center_offset):
         self.is_animating = True
         self.time_step = 0
         # self.num_frames = ...
-        self.num_frames = len(self.fourier_coeffs) 
+        #self.num_frames = len(self.fourier_coeffs) 
+        self.num_frames = self.transform_N
         self.center_offset = center_offset
         self.update_frame()
 
@@ -124,6 +138,7 @@ class DoodlingApp:
         # TODO: Implementation
         # 1. Calculate the current time 't' based on self.time_step
         N = self.num_frames
+        # N = self.transform_N
         t = self.time_step
         # 2. Reconstruct the signal value 'z' at time 't' 
         x = self.center_offset[0]

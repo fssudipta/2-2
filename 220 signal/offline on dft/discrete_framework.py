@@ -74,13 +74,6 @@ class DFTAnalyzer:
         Returns: numpy array (time-domain samples).
         """
         # TODO: Implement Naive IDFT equation
-        """N = len(spectrum)
-        x = np.zeros(len(spectrum), dtype=np.complex128)
-        for n in range(N):
-            for k in range(N):
-                angle = 2j * np.pi * k * n / N
-                x[n] += spectrum[k] * np.exp(angle)
-        return x / N"""
         N = len(spectrum)
         n = np.arange(N)
         k = n.reshape((N, 1))
@@ -114,11 +107,17 @@ class FastFourierTransform(DFTAnalyzer):
         # combine using the butterfly mathematical formula
         # X[k] = E[k]+exp(-2j*pi*k/N)*O[k]
         combined = np.zeros(N, dtype=np.complex128)
-        for k in range(N // 2):
+        """for k in range(N // 2):
             rotator_factor = np.exp(-2j * np.pi * k / N) * odd[k]
             combined[k] = even[k] + rotator_factor
             combined[k + N // 2] = even[k] - rotator_factor
+        return combined"""
+        k = np.arange(N//2)
+        twiddles = np.exp(-2j * np.pi * k / N) * odd
+        combined[:N // 2] = even + twiddles
+        combined[N // 2:] = even - twiddles
         return combined
+
 
     def compute_idft(self, spectrum):
         N = len(spectrum)
