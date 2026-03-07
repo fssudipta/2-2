@@ -97,4 +97,4 @@ class ArbitraryFFTAnalyzer:
         c = self.radix2.compute_idft(C)
 
         result = c[:N] * np.exp(-1j * np.pi * n**2 / N)
-        return result
+        return result 
