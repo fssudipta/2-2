@@ -84,8 +84,8 @@ class DoodlingApp:
         signal = signal.interpolate(new_N)
         # 2. Select Algorithm 
         if self.use_fft.get():
-            #analyzer = FastFourierTransform()
-            analyzer = ArbitraryFFTAnalyzer()
+            analyzer = FastFourierTransform()
+            #analyzer = ArbitraryFFTAnalyzer()
             print("fft")
         else: 
             analyzer=DFTAnalyzer()
