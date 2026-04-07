@@ -45,7 +45,7 @@ The system manages five course states with specific transition rules:
 - OPEN → DRAFT ✓
 - OPEN → CANCELLED ✓
 
-**From FULL:**
+**From FULL:** 
 
 - FULL → CLOSED ✓ (admin prompted to optionally increase capacity; if yes, random students selected from waitlist)
 - FULL → CANCELLED ✓
